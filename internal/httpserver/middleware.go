@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -241,6 +242,34 @@ func clientIPKeyWithTrustedProxies(trustedProxyHops int) func(*http.Request) str
 			}
 		}
 		return clientIPKey(request)
+	}
+}
+
+func sourceValidation(appOrigin string, renderer *templates.Renderer) middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodPost {
+				next.ServeHTTP(responseWriter, request)
+				return
+			}
+			origin := request.Header.Get("Origin")
+			if _, present := request.Header["Origin"]; !present {
+				referer, err := url.Parse(request.Referer())
+				if err == nil && referer.Scheme != "" && referer.Host != "" {
+					origin = referer.Scheme + "://" + referer.Host
+				}
+			}
+			if origin != appOrigin {
+				if err := httpx.RespondWithErrorPage(
+					responseWriter, renderer,
+					http.StatusForbidden, "Forbidden", "Invalid origin",
+				); err != nil {
+					http.Error(responseWriter, "Internal Server Error", http.StatusInternalServerError)
+				}
+				return
+			}
+			next.ServeHTTP(responseWriter, request)
+		})
 	}
 }
 
