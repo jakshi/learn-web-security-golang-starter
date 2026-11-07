@@ -240,6 +240,7 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 	handler := applyMiddleware(
 		mainMux,
 		cspNonce,
+		setCSP(),
 		recoverPanics(logger, renderer),
 		setContentTypeOption(),
 	)
