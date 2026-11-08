@@ -230,6 +230,15 @@ func setCSP() func(http.Handler) http.Handler {
 	}
 }
 
+func setReferrerPolicy() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			responseWriter.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			next.ServeHTTP(responseWriter, request)
+		})
+	}
+}
+
 func clientIPKey(request *http.Request) string {
 	host, _, err := net.SplitHostPort(request.RemoteAddr)
 	if err == nil && host != "" {
