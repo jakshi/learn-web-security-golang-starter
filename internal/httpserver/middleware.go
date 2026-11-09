@@ -37,6 +37,13 @@ func publicCORS(next http.Handler) http.Handler {
 	})
 }
 
+func allowCrossOriginResource(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		responseWriter.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+		next.ServeHTTP(responseWriter, request)
+	})
+}
+
 func cspNonce(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
 		nonceBytes := make([]byte, 16)
@@ -200,30 +207,31 @@ func setRateLimitHeaders(responseWriter http.ResponseWriter, state rateLimitStat
 	responseWriter.Header().Set("RateLimit-Reset", strconv.FormatInt(state.resetAt.Unix()+boolToInt64(state.resetAt.Nanosecond() > 0), 10))
 }
 
-func setContentTypeOption() func(http.Handler) http.Handler {
+func securityHeaders() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-			responseWriter.Header().Set("X-Content-Type-Options", "nosniff")
-			next.ServeHTTP(responseWriter, request)
-		})
-	}
-}
 
-func setCSP() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			// Content loading, framing, and content types.
 			nonce := httpx.CSPNonce(request.Context())
 			responseWriter.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self'; img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'")
 			responseWriter.Header().Set("X-Frame-Options", "SAMEORIGIN")
-			next.ServeHTTP(responseWriter, request)
-		})
-	}
-}
+			responseWriter.Header().Set("X-Content-Type-Options", "nosniff")
 
-func setReferrerPolicy() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+			// Document and resource isolation.
+			responseWriter.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+			responseWriter.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
+			responseWriter.Header().Set("Origin-Agent-Cluster", "?1")
+
+			// Referrer and DNS privacy.
 			responseWriter.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			responseWriter.Header().Set("X-DNS-Prefetch-Control", "off")
+
+			// Legacy browser and plugin policies.
+			responseWriter.Header().Set("X-Download-Options", "noopen")
+			responseWriter.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
+			// Disable legacy XSS filters that can introduce vulnerabilities.
+			responseWriter.Header().Set("X-XSS-Protection", "0")
+
 			next.ServeHTTP(responseWriter, request)
 		})
 	}

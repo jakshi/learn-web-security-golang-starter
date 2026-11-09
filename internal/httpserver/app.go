@@ -236,9 +236,9 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 	mainMux.Handle("GET /styles.css", staticHandler)
 	mainMux.Handle("GET /passkey.js", staticHandler)
 	mainMux.Handle("GET /vendor/simplewebauthn/index.umd.min.js", staticHandler)
-	mainMux.Handle("GET /shipping-widget.css", staticHandler)
+	mainMux.Handle("GET /shipping-widget.css", allowCrossOriginResource(staticHandler))
 	mainMux.Handle("GET /shipping-widget.html", staticHandler)
-	mainMux.Handle("GET /shipping-widget.js", staticHandler)
+	mainMux.Handle("GET /shipping-widget.js", allowCrossOriginResource(staticHandler))
 	mainMux.Handle("GET /product-photos/{filename}", staticHandler)
 	mainMux.HandleFunc("POST /integrations/pawpal/webhook", pawPalHandler.Webhook)
 	mainMux.Handle("/", dynamicHandler)
@@ -246,10 +246,8 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 	handler := applyMiddleware(
 		mainMux,
 		cspNonce,
-		setCSP(),
-		setReferrerPolicy(),
+		securityHeaders(),
 		recoverPanics(logger, renderer),
-		setContentTypeOption(),
 	)
 	return &Application{Handler: handler, publicRoot: publicRoot}, nil
 }
