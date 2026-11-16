@@ -15,7 +15,11 @@ func RespondWithError(responseWriter http.ResponseWriter, code int, message stri
 	if code >= 500 {
 		fmt.Printf("Responding with error code %v, message: %v\n", code, message)
 	}
-	RespondWithJSON(responseWriter, code, map[string]string{"error": message})
+	if code >= 500 {
+		RespondWithJSON(responseWriter, code, map[string]string{"error": "The request failed. Try again, or return to the store."})
+	} else {
+		RespondWithJSON(responseWriter, code, map[string]string{"error": message})
+	}
 }
 
 func RespondWithJSON(responseWriter http.ResponseWriter, code int, payload any) {
@@ -28,6 +32,10 @@ func RespondWithJSON(responseWriter http.ResponseWriter, code int, payload any) 
 }
 
 func RespondWithErrorPage(responseWriter http.ResponseWriter, renderer *templates.Renderer, statusCode int, title, message string) error {
+	if statusCode >= 500 {
+		title = "Something Went Wrong"
+		message = "The request failed. Try again, or return to the store."
+	}
 	return renderer.Render(responseWriter, statusCode, "error", templates.ErrorPage{
 		Title:      title,
 		StatusCode: statusCode,
